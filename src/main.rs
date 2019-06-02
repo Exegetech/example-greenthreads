@@ -197,12 +197,17 @@ fn yield_thread() {
 /// 
 /// This is essentially all we need to do to save and resume execution.
 /// 
-/// Some details about inline assembly:
-/// First ":" after ":" we have our output parameters, this is values we write data to. We use "=*m" since we pass a pointer
+/// Some details about inline assembly.
+/// 
+/// The assembly commands in the string literal is called the assemblt template. It is preceeded by
+/// zero or up to four segments indicated by ":":
+/// 
+/// - First ":" we have our output parameters, this is values we write data to. We use "=*m" since we pass a pointer
 /// in and we want to write to the location of the data the pointer points to.
-/// Second ":" we have the input parameters which is our "new" context. We only read from this data.
-/// Third ":" This our clobber list, this is information to the compiler that these registers can't be used freely
-/// Fourth ":" This is options we can pass inn, Rust has 3: "alignstack", "volatile" and "intel"
+/// - Second ":" we have the input parameters which is our "new" context. We only read from this data.
+/// - Third ":" This our clobber list, this is information to the compiler that these registers can't be used freely
+/// - Fourth ":" This is options we can pass inn, Rust has 3: "alignstack", "volatile" and "intel"
+/// 
 /// For this to work (partially) on windows we need to use "alignstack" where the compiler adds the neccesary padding to
 /// make sure our stack is aligned.
 /// 
