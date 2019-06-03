@@ -172,7 +172,7 @@ impl Runtime {
 /// This is our guard function that we place on top of the stack. All this function does is set the 
 /// state of our current thread and then `yield` which will then schedule a new thread to be run.
 /// For an explanation about the naked attribute see the comments for `switch` below.
-#[naked]
+#[cfg_attr(target_os="windows", naked)]
 fn guard() -> ! {
     unsafe {
         let rt_ptr = RUNTIME as *mut Runtime;
