@@ -15,7 +15,7 @@ struct Runtime {
 
 #[derive(PartialEq, Eq, Debug)]
 enum State {
-    Parked,
+    Available,
     Running,
     Ready,
 }
@@ -48,7 +48,7 @@ impl Thread {
             id,
             stack: vec![0_u8; DEFAULT_STACK_SIZE],
             ctx: ThreadContext::default(),
-            state: State::Parked,
+            state: State::Available,
         }
     }
 }
@@ -90,7 +90,7 @@ impl Runtime {
     fn run(&mut self) -> ! {
         let current = self.current;
         if current != 0 {
-            self.threads[current].state = State::Parked;
+            self.threads[current].state = State::Available;
             self.t_yield();
         }
 
@@ -117,7 +117,7 @@ impl Runtime {
             }
         }
 
-        if self.threads[self.current].state != State::Parked {
+        if self.threads[self.current].state != State::Available {
             self.threads[self.current].state = State::Ready;
         }
 
@@ -153,7 +153,7 @@ impl Runtime {
         let available = self
             .threads
             .iter_mut()
-            .find(|t| t.state == State::Parked)
+            .find(|t| t.state == State::Available)
             .expect("no available thread.");
 
         let size = available.stack.len();
@@ -267,5 +267,6 @@ fn main() {
             yield_thread();
         }
     });
+    
     runtime.run();
 }
