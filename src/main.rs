@@ -6,9 +6,8 @@ use std::ptr;
 const DEFAULT_STACK_SIZE: usize = 1024 * 1024 * 2;
 const MAX_THREADS: usize = 4;
 static mut RUNTIME: usize = 0;
-static mut STACK_PTR: *mut usize = 0 as *mut usize;
 
-struct Runtime {
+pub struct Runtime {
     threads: Vec<Thread>,
     current: usize,
 }
@@ -54,7 +53,7 @@ impl Thread {
 }
 
 impl Runtime {
-    fn new() -> Self {
+    pub fn new() -> Self {
         // This will be our base thread, which will be initialized in the `running` state
         let base_thread = Thread {
             id: 0,
@@ -76,26 +75,28 @@ impl Runtime {
 
     /// This is cheating a bit, but we need a pointer to our Runtime stored so we can call yield on it even if
     /// we don't have a reference to it.
-    fn init(&self) {
+    pub fn init(&self) {
         unsafe {
             let r_ptr: *const Runtime = self;
             RUNTIME = r_ptr as usize;
         }
     }
 
-    /// This is where we start running our runtime. If the current thread is not our base thread we set its state to
-    /// Parked. It means we're finished with it. Then we yield which will schedule a new thread to be run.
-    /// If it is our base thread, we call yield until it returns false (which means that there are no threads scheduled)
-    /// and we are done.
-    fn run(&mut self) -> ! {
-        let current = self.current;
-        if current != 0 {
-            self.threads[current].state = State::Available;
-            self.t_yield();
-        }
-
+    /// This is where we start running our runtime. If it is our base thread, we call yield until 
+    /// it returns false (which means that there are no threads scheduled) and we are done.
+    pub fn run(&mut self) -> ! {
         while self.t_yield() {}
         std::process::exit(0);
+    }
+
+    /// This is our return function. The only place we use this is in our `guard` function. 
+    /// If the current thread is not our base thread we set its state to Available. It means 
+    /// we're finished with it. Then we yield which will schedule a new thread to be run.
+    fn t_return(&mut self) {
+        if self.current != 0 {
+            self.threads[self.current].state = State::Available;
+            self.t_yield();
+        }
     }
     
     /// This is the heart of our runtime. Here we go through all threads and see if anyone is in the `Ready` state.
@@ -149,7 +150,7 @@ impl Runtime {
     /// executing that first when we are scheuled to run.
     /// 
     /// Lastly we set the state as `Ready` which means we have work to do and is ready to do it.
-    fn spawn(&mut self, f: fn()) {
+    pub fn spawn(&mut self, f: fn()) {
         let available = self
             .threads
             .iter_mut()
@@ -173,12 +174,12 @@ impl Runtime {
 /// state of our current thread and then `yield` which will then schedule a new thread to be run.
 /// For an explanation about the naked attribute see the comments for `switch` below.
 #[cfg_attr(target_os="windows", naked)]
-fn guard() -> ! {
+fn guard() {
     unsafe {
         let rt_ptr = RUNTIME as *mut Runtime;
         let rt = &mut *rt_ptr;
         println!("THREAD {} FINISHED.", rt.threads[rt.current].id);
-        rt.run();
+        rt.t_return();
     };
     
 }
@@ -186,7 +187,7 @@ fn guard() -> ! {
 /// We know that Runtime is alive the length of the program and that we only access from one core 
 /// (so no datarace). We yield execution of the current thread  by dereferencing a pointer to our 
 /// Runtime and then calling `t_yield` 
-fn yield_thread() {
+pub fn yield_thread() {
     unsafe {
         let rt_ptr = RUNTIME as *mut Runtime;
         (*rt_ptr).t_yield();
