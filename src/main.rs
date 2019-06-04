@@ -15,7 +15,7 @@ struct Runtime {
 
 #[derive(PartialEq, Eq, Debug)]
 enum State {
-    Parked,
+    Available,
     Running,
     Ready,
 }
@@ -48,7 +48,7 @@ impl Thread {
             id,
             stack: vec![0_u8; DEFAULT_STACK_SIZE],
             ctx: ThreadContext::default(),
-            state: State::Parked,
+            state: State::Available,
         }
     }
 }
@@ -90,7 +90,7 @@ impl Runtime {
     fn run(&mut self) -> ! {
         let current = self.current;
         if current != 0 {
-            self.threads[current].state = State::Parked;
+            self.threads[current].state = State::Available;
             self.t_yield();
         }
 
@@ -117,7 +117,7 @@ impl Runtime {
             }
         }
 
-        if self.threads[self.current].state != State::Parked {
+        if self.threads[self.current].state != State::Available {
             self.threads[self.current].state = State::Ready;
         }
 
@@ -153,7 +153,7 @@ impl Runtime {
         let available = self
             .threads
             .iter_mut()
-            .find(|t| t.state == State::Parked)
+            .find(|t| t.state == State::Available)
             .expect("no available thread.");
 
         let size = available.stack.len();
@@ -171,7 +171,8 @@ impl Runtime {
 
 /// This is our guard function that we place on top of the stack. All this function does is set the 
 /// state of our current thread and then `yield` which will then schedule a new thread to be run.
-#[naked]
+/// For an explanation about the naked attribute see the comments for `switch` below.
+#[cfg_attr(target_os="windows", naked)]
 fn guard() -> ! {
     unsafe {
         let rt_ptr = RUNTIME as *mut Runtime;
@@ -266,5 +267,6 @@ fn main() {
             yield_thread();
         }
     });
+    
     runtime.run();
 }
