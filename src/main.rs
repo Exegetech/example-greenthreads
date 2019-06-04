@@ -3,7 +3,7 @@
 use std::ptr;
 
 // In our simple example we set most constraints here.
-const DEFAULT_STACK_SIZE: usize = 1024 * 1024 * 8;
+const DEFAULT_STACK_SIZE: usize = 1024 * 1024 * 2;
 const MAX_THREADS: usize = 4;
 static mut RUNTIME: usize = 0;
 static mut STACK_PTR: *mut usize = 0 as *mut usize;
