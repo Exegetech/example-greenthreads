@@ -60,6 +60,8 @@ impl Runtime {
             stack: vec![0_u8; DEFAULT_STACK_SIZE],
             ctx: ThreadContext::default(),
             state: State::Running,
+            // We initialize the thread with an empty Fn(), we could make this an Option<Box<dyn Fn()>>, but
+            // we controll instanciation in "spawn" so just to KISS in the example we keep it like this for now.
             code: Box::new(||{}),
         };
 
@@ -136,8 +138,8 @@ impl Runtime {
 
         // lets put our Fn() trait object on the heap and store it in our thread for now
         available.code = Box::new(f);
-        // we need a direct reference to this thread to run the code so we need this additional
-        // context
+        // we need a direct reference to this thread to run our Fn() so we need this additional
+        // context associated with a thread
         available.ctx.thread_ptr = available as *const Thread as u64;
 
         unsafe {
@@ -173,8 +175,8 @@ pub fn yield_thread() {
 }
 
 // see: https://github.com/rust-lang/rfcs/blob/master/text/1201-naked-fns.md
-// we don't have to store the code when we switch out of the thread but we need to
-// provide a pointer to it when we switch to a thread.
+// we don't have to store the pointer to our thread when we switch out of the thread but we need to
+// provide a pointer to it when we switch to a thread
 #[naked]
 #[cfg(not(target_os="windows"))]
 unsafe fn switch(old: *mut ThreadContext, new: *const ThreadContext) {
@@ -200,7 +202,7 @@ unsafe fn switch(old: *mut ThreadContext, new: *const ThreadContext) {
     : "=*m"(old)
     : "r"(new)
     :
-    : "alignstack" // needed to work on windows
+    : "alignstack"
     );
 }
 
@@ -230,7 +232,7 @@ unsafe fn switch(old: *mut ThreadContext, new: *const ThreadContext) {
     : "=*m"(old)
     : "r"(new)
     :
-    : "alignstack" // needed to work on windows
+    : "alignstack" 
     );
 }
 
