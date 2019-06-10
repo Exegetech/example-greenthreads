@@ -25,7 +25,7 @@ struct Thread {
     stack: Vec<u8>,
     ctx: ThreadContext,
     state: State,
-    code: Box<Fn()>,
+    task: Option<Box<Fn()>>,
 }
 
 #[derive(Debug, Default)]
@@ -48,7 +48,7 @@ impl Thread {
             stack: vec![0_u8; DEFAULT_STACK_SIZE],
             ctx: ThreadContext::default(),
             state: State::Available,
-            code: Box::new(||{}),
+            task: None,
         }
     }
 }
@@ -60,9 +60,7 @@ impl Runtime {
             stack: vec![0_u8; DEFAULT_STACK_SIZE],
             ctx: ThreadContext::default(),
             state: State::Running,
-            // We initialize the thread with an empty Fn(), we could make this an Option<Box<dyn Fn()>>, but
-            // we controll instanciation in "spawn" so just to KISS in the example we keep it like this for now.
-            code: Box::new(||{}),
+            task: None,
         };
 
         let mut threads = vec![base_thread];
@@ -137,9 +135,9 @@ impl Runtime {
         let s_ptr = available.stack.as_mut_ptr();
 
         // lets put our Fn() trait object on the heap and store it in our thread for now
-        available.code = Box::new(f);
-        // we need a direct reference to this thread to run our Fn() so we need this additional
-        // context associated with a thread
+        available.task = Some(Box::new(f));
+        // we needtaskirect reference to this thread to run the code so we need this additional
+        // context
         available.ctx.thread_ptr = available as *const Thread as u64;
 
         unsafe {
@@ -153,8 +151,9 @@ impl Runtime {
 
 fn call(thread: u64) {
         let thread = unsafe {&*(thread as *const Thread)};
-        let f = &thread.code;
-        f();
+            if let Some(f) = &thread.task {
+            f();
+        }
 }
 
 #[cfg_attr(any(target_os="windows", target_os="linux"), naked)]
@@ -175,8 +174,8 @@ pub fn yield_thread() {
 }
 
 // see: https://github.com/rust-lang/rfcs/blob/master/text/1201-naked-fns.md
-// we don't have to store the pointer to our thread when we switch out of the thread but we need to
-// provide a pointer to it when we switch to a thread
+// we don't have to store the code when we switch out of the thread but we need to
+// provide a pointer to it when we switch to a thread.
 #[naked]
 #[cfg(not(target_os="windows"))]
 unsafe fn switch(old: *mut ThreadContext, new: *const ThreadContext) {
@@ -202,11 +201,12 @@ unsafe fn switch(old: *mut ThreadContext, new: *const ThreadContext) {
     : "=*m"(old)
     : "r"(new)
     :
-    : "alignstack"
+    : "alignstack" 
     );
 }
 
-
+/// Windows uses the `rcx` register for the first parameter.
+/// See: https://docs.microsoft.com/en-us/cpp/build/x64-software-conventions?view=vs-2019#register-volatility-and-preservation
 #[naked]
 #[cfg(target_os="windows")]
 unsafe fn switch(old: *mut ThreadContext, new: *const ThreadContext) {
